@@ -6,10 +6,12 @@ Stage race: 8 stages (1 prologue/ITT + 1 sprint + 2 hills + 3 mountain + 1 ITT)
 """
 import re
 import sys
+from pathlib import Path
 
-VUELTA = '/tmp/build_suisse/source/index.html'
-DRIVERS_JS = '/tmp/build_suisse/source/DRIVERS.js'
-OUT = '/tmp/build_suisse/output.html'
+ROOT = Path(__file__).resolve().parent
+VUELTA = ROOT / 'source/index.html'
+DRIVERS_JS = ROOT / 'source/DRIVERS.js'
+OUT = ROOT / 'output.html'
 
 with open(VUELTA, 'r') as f:
     html = f.read()
@@ -161,7 +163,7 @@ html = html.replace("'${wins} stage wins'", "'${wins} stage wins'")
 # Update finale title "Strong" / "Polka dot" to TdS labels
 # Vuelta had: "STRONG", "POLKA DOT BID" — change to climbing/ITT themed
 html = html.replace('🚴 STRONG — ${wins} stage wins', '🇨🇭 CONQUEROR — ${wins} stage wins')
-html = html.replace('🚴 POLKA DOT BID — ${wins} stage wins', '🏔️ ALPINE — ${wins} stage wins')
+html = html.replace('🚴 POLKA DOT BID — ${wins} stage wins', '🏔 ALPINE — ${wins} stage wins')
 
 # === 11b) Header emoji (Vuelta used 🔴, TdS uses 🇨🇭) ===
 # Apply only to specific title/subtitle positions, not the cross-link footer
@@ -176,7 +178,7 @@ html = html.replace('for 🔴 Tour de Suisse', 'for 🇨🇭 Tour de Suisse')
 # Finale labels: STRONG/SPRINT/Polka Dot → Swiss-themed
 # These are inside template literal: `🔴 STRONG — ${wins} stage wins`
 html = html.replace('`🔴 STRONG — ${wins} stage wins`', '`🇨🇭 CONQUEROR — ${wins} stage wins`')
-html = html.replace('`🔴 SPRINT BID — ${wins} stage wins`', '`🏔️ ALPINE — ${wins} stage wins`')
+html = html.replace('`🔴 SPRINT BID — ${wins} stage wins`', '`🏔 ALPINE — ${wins} stage wins`')
 
 # === 12) n !== 6 bug (defensive fix per 8/28 + 9/5 lessons) ===
 html = html.replace("disabled = n !== 6;", "disabled = n !== 5;")
@@ -256,8 +258,10 @@ for old, new in ai_patterns:
         break
 
 # === 17) Save ===
+html = html.replace('\ufe0f', '')
 with open(OUT, 'w') as f:
     f.write(html)
+(ROOT / 'index.html').write_text(html)
 print(f"\n  Output: {OUT} ({len(html)} bytes)")
 
 # === 18) Verify checks ===
@@ -295,6 +299,6 @@ for s in leakage:
         if s in ('Vingegaard', 'Contador'):
             print(f"    ✅ {s} count={n} (TdS dataset, allowed)")
         else:
-            print(f"    ⚠️  {s} count={n} (leakage!)")
+            print(f"    ⚠  {s} count={n} (leakage!)")
     else:
         print(f"    ✅ {s} count=0 (clean)")

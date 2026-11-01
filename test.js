@@ -1,6 +1,6 @@
 // Test.js — Tour de Suisse 8-0 Monte Carlo validation
 const fs = require('fs');
-const html = fs.readFileSync('/tmp/build_suisse/output.html', 'utf8');
+const html = fs.readFileSync(require('path').join(__dirname, 'output.html'), 'utf8');
 const m = html.match(/<script>([\s\S]*?)<\/script>/);
 if (!m) { console.log('ERROR: no <script> tag found'); process.exit(1); }
 const code = m[1];
@@ -15,8 +15,9 @@ const fakeEl = {
   scrollTop: 0, scrollHeight: 0, style: {},
   dataset: {},
 };
+const elements = {};
 global.document = {
-  getElementById: () => fakeEl,
+  getElementById: id => elements[id] || (elements[id] = { ...fakeEl }),
   querySelectorAll: () => [],
   createElement: () => ({ className: '', innerHTML: '', onclick: null, appendChild: noop, style: {} }),
 };
@@ -25,8 +26,38 @@ global.localStorage = { getItem: () => null, setItem: noop };
 
 // Wrap code + expose API
 const fn = new Function('document', 'setTimeout', 'localStorage',
-  code + '; return { DRIVERS, SCHEDULE, simulateRace, pointsForPos, ERA_NAMES, ERA_LABELS, mulberry32 };');
+  code + '; return { DRIVERS, SCHEDULE, simulateRace, pointsForPos, ERA_NAMES, ERA_LABELS, mulberry32, winProb, draftDriver, undraftDriver, showFinale, get state() { return state; } };');
 const api = fn(global.document, global.setTimeout, global.localStorage);
+
+const assert = require('assert');
+assert.strictEqual(api.DRIVERS.length, 84);
+assert.strictEqual(api.SCHEDULE.length, 8);
+assert.strictEqual(new Set(api.DRIVERS.map(d => d.id)).size, 84);
+for (const d of api.DRIVERS.slice(0, 5)) api.draftDriver(d);
+assert.strictEqual(api.state.drafted.length, 5);
+assert.strictEqual(elements['start-btn'].disabled, false);
+assert(elements['count-text'].textContent.includes('Roster Complete'));
+api.undraftDriver(api.DRIVERS[0].id);
+assert.strictEqual(api.state.drafted.length, 4);
+assert(elements['help-text'].textContent.startsWith('Pick 1 more.'));
+api.draftDriver(api.DRIVERS[0]);
+elements['start-btn'].onclick();
+assert.strictEqual(elements['race-track'].textContent, `${api.SCHEDULE[0].desc} · ITT`);
+assert(Math.abs(api.winProb(85, 'ITT') - api.winProb(85, 'flat') - 0.02) < 1e-10);
+for (let wins = 0; wins <= 8; wins++) {
+  api.state.season.playerWins = wins;
+  api.showFinale();
+  assert.strictEqual(elements['finale-record'].textContent, `${wins}-${8 - wins}`);
+  assert.strictEqual(elements['share-record'].textContent, `${wins}-${8 - wins}`);
+  assert.strictEqual(elements['finale-title'].textContent.includes('UNDEFEATED'), wins === 8);
+  assert.strictEqual(elements['finale-badges'].innerHTML.includes('Sweep'), wins === 8);
+}
+elements['replay-btn'].onclick();
+for (const d of api.DRIVERS.slice(0, 5)) api.draftDriver(d);
+for (const id of ['season-wins', 'season-streak', 'season-points']) elements[id].textContent = '99';
+elements['start-btn'].onclick();
+for (const id of ['season-wins', 'season-streak', 'season-points']) assert.strictEqual(elements[id].textContent, '0');
+console.log('Regression checks passed');
 
 console.log('=== Tour de Suisse 8-0 Monte Carlo Test ===');
 console.log('DRIVERS count:', api.DRIVERS ? api.DRIVERS.length : 'UNDEFINED');
